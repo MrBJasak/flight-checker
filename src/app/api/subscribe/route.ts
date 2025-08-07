@@ -34,7 +34,6 @@ export async function POST(req: Request) {
     });
 
     try {
-      console.log('Sending welcome email to:', email);
       await emailService.sendWelcomeEmail({
         email,
         latitude,

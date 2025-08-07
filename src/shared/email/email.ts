@@ -44,7 +44,6 @@ class EmailService {
         html: htmlContent,
       });
 
-      console.log(`📧 Email wysłany do ${data.email} o samolocie ${data.callsign || data.icao}`);
       return true;
     } catch (error) {
       console.error('❌ Błąd wysyłania emaila:', error);
@@ -73,7 +72,6 @@ class EmailService {
         html: htmlContent,
       });
 
-      console.log(`📧 Email powitalny wysłany do ${data.email}`);
       return true;
     } catch (error) {
       console.error('❌ Błąd wysyłania emaila powitalnego:', error);

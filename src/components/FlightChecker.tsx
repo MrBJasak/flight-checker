@@ -4,6 +4,7 @@ import FlightForm from '@/components/FlightForm';
 import LocationPicker from '@/components/LocationPicker';
 import ThemeToggle from '@/shared/components/ThemeToggle';
 import axios from 'axios';
+import Link from 'next/link';
 import { useState } from 'react';
 import { HiOutlinePaperAirplane } from 'react-icons/hi2';
 import { useToast } from '../shared/hooks/useToast';
@@ -86,6 +87,16 @@ export default function FlightChecker() {
               <LocationPicker radius={currentRadius} onLocationChange={handleLocationChange} location={location} />
             </div>
           </div>
+        </div>
+        
+        {/* Link to unsubscribe */}
+        <div className="text-center mt-6">
+          <Link
+            href="/unsubscribe"
+            className="inline-flex items-center gap-2 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors text-sm"
+          >
+            Chcesz anulować subskrypcję?
+          </Link>
         </div>
       </div>
     </div>
