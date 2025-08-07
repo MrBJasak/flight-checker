@@ -1,3 +1,5 @@
+import { AircraftFilter } from '../types';
+
 export interface EmailConfig {
   host: string;
   port: number;
@@ -22,4 +24,5 @@ export interface WelcomeEmailData {
   latitude: number;
   longitude: number;
   radius: number;
+  aircraftFilters?: AircraftFilter[];
 }

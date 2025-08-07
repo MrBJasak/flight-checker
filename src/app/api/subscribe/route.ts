@@ -1,12 +1,13 @@
 import { eq } from 'drizzle-orm';
 import { emailService } from '../../../shared/email/email';
 import { db } from '../../../shared/lib/db';
-import { subscriptions } from '../../../shared/lib/db/schema';
+import { subscriptions, subscriptionAircraft } from '../../../shared/lib/db/schema';
+import { AircraftFilter } from '../../../shared/types';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { email, latitude, longitude, radius } = body;
+    const { email, latitude, longitude, radius, aircraftFilters } = body;
 
     if (!email || !latitude || !longitude || !radius) {
       return new Response(
@@ -26,11 +27,34 @@ export async function POST(req: Request) {
       });
     }
 
-    await db.insert(subscriptions).values({
-      email,
-      latitude,
-      longitude,
-      radius,
+    // Wstaw subskrypcję w transakcji
+    await db.transaction(async (tx) => {
+      // Wstaw subskrypcję
+      const [subscription] = await tx.insert(subscriptions).values({
+        email,
+        latitude,
+        longitude,
+        radius,
+      }).returning({ id: subscriptions.id });
+
+      // Jeśli są filtry samolotów, wstaw je
+      if (aircraftFilters && Array.isArray(aircraftFilters) && aircraftFilters.length > 0) {
+        const filterInserts = aircraftFilters
+          .filter((filter: AircraftFilter) => 
+            filter.manufacturerName || filter.model || filter.typeCode || filter.operator
+          )
+          .map((filter: AircraftFilter) => ({
+            subscriptionId: subscription.id,
+            manufacturername: filter.manufacturerName || null,
+            model: filter.model || null,
+            typecode: filter.typeCode || null,
+            operator: filter.operator || null,
+          }));
+
+        if (filterInserts.length > 0) {
+          await tx.insert(subscriptionAircraft).values(filterInserts);
+        }
+      }
     });
 
     try {
@@ -39,6 +63,7 @@ export async function POST(req: Request) {
         latitude,
         longitude,
         radius,
+        aircraftFilters,
       });
     } catch (emailError) {
       console.error('Error sending welcome email:', emailError);

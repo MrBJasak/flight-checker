@@ -5,10 +5,18 @@ export interface LocationData {
   address?: string;
 }
 
+export interface AircraftFilter {
+  manufacturername?: string;
+  model?: string;
+  typecode?: string;
+  operator?: string;
+}
+
 export interface FormData {
   email: string;
   radius: number;
   location?: LocationData;
+  aircraftFilters?: AircraftFilter[];
 }
 
 export interface LocationInfo {

@@ -5,7 +5,9 @@ import { useForm } from 'react-hook-form';
 import { HiCheckCircle, HiCog, HiExclamationCircle, HiMail } from 'react-icons/hi';
 import { z } from 'zod';
 import { formSchema } from '../shared/lib/validation';
-import { FormData, LocationData } from '../shared/types';
+import { FormData, LocationData, AircraftFilter } from '../shared/types';
+import AircraftSelector from './AircraftSelector';
+import { useEffect, useState } from 'react';
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -15,14 +17,31 @@ interface FlightFormProps {
   onRadiusChange?: (radius: number) => void;
 }
 
+interface AircraftOptions {
+  manufacturers: string[];
+  models: string[];
+  typeCodes: string[];
+  operators: string[];
+}
+
 export default function FlightForm({ onSubmit, location, onRadiusChange }: FlightFormProps) {
+  const [aircraftFilters, setAircraftFilters] = useState<AircraftFilter[]>([]);
+  const [aircraftOptions, setAircraftOptions] = useState<AircraftOptions>({
+    manufacturers: [],
+    models: [],
+    typeCodes: [],
+    operators: [],
+  });
+  const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isValid },
-  } = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
+  } = useForm<Omit<FormValues, 'aircraftFilters'>>({
+    resolver: zodResolver(formSchema.omit({ aircraftFilters: true })),
     defaultValues: {
       email: '',
       radius: 5,
@@ -32,17 +51,39 @@ export default function FlightForm({ onSubmit, location, onRadiusChange }: Fligh
 
   const radius = watch('radius');
 
-  const onFormSubmit = (data: FormValues) => {
+  // Pobierz opcje samolotów
+  useEffect(() => {
+    const fetchAircraftOptions = async () => {
+      setIsLoadingOptions(true);
+      try {
+        const response = await fetch('/api/aircraft-options');
+        if (response.ok) {
+          const options = await response.json();
+          setAircraftOptions(options);
+        }
+      } catch (error) {
+        console.error('Błąd podczas pobierania opcji samolotów:', error);
+      } finally {
+        setIsLoadingOptions(false);
+      }
+    };
+
+    fetchAircraftOptions();
+  }, []);
+
+  const onFormSubmit = (data: Omit<FormValues, 'aircraftFilters'>) => {
     if (!location) {
       return;
     }
 
     onSubmit({
-      ...data,
+      email: data.email,
+      radius: data.radius,
       location: {
         ...location,
         radius: data.radius,
       },
+      aircraftFilters,
     });
   };
 
@@ -126,6 +167,15 @@ export default function FlightForm({ onSubmit, location, onRadiusChange }: Fligh
           </div>
         </div>
       </div>
+
+      {/* Aircraft Selector */}
+      {!isLoadingOptions && (
+        <AircraftSelector
+          selectedFilters={aircraftFilters}
+          onFiltersChange={setAircraftFilters}
+          availableOptions={aircraftOptions}
+        />
+      )}
 
       {/* Submit Button */}
       <div className='space-y-4'>
