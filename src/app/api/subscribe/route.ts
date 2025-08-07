@@ -1,5 +1,6 @@
 
 import { eq } from 'drizzle-orm';
+import { emailService } from '../../../shared/email/email';
 import { db } from '../../../shared/lib/db';
 import { subscriptions } from '../../../shared/lib/db/schema';
 
@@ -8,7 +9,6 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { email, latitude, longitude, radius } = body;
 
-    // Walidacja danych
     if (!email || !latitude || !longitude || !radius) {
       return new Response(
         JSON.stringify({ 
@@ -18,7 +18,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Sprawdź czy email jest już zarejestrowany
     const existing = await db
       .select()
       .from(subscriptions)
@@ -31,7 +30,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // Dodaj nową subskrypcję
     await db.insert(subscriptions).values({
       email,
       latitude,
@@ -39,18 +37,17 @@ export async function POST(req: Request) {
       radius,
     });
 
-    // try {
-    //     console.log('Sending welcome email to:', email);
-    //   await emailService.sendWelcomeEmail({
-    //     email,
-    //     latitude,
-    //     longitude,
-    //     radius,
-    //   });
-    // } catch (emailError) {
-    //   console.error('Error sending welcome email:', emailError);
-    //   // Nie przerywamy procesu jeśli email się nie wysłał
-    // }
+    try {
+        console.log('Sending welcome email to:', email);
+      await emailService.sendWelcomeEmail({
+        email,
+        latitude,
+        longitude,
+        radius,
+      });
+    } catch (emailError) {
+      console.error('Error sending welcome email:', emailError);
+    }
 
     return new Response(
       JSON.stringify({ message: 'Subscribed successfully' }), 
