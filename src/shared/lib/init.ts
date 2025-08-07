@@ -1,12 +1,7 @@
-
-
 export async function initializeServices() {
   console.log('🚀 Inicjalizacja serwisów Flight Checker...');
 
   try {
-   
-
-
     console.log('✅ Wszystkie serwisy zostały zainicjalizowane');
   } catch (error) {
     console.error('❌ Błąd inicjalizacji serwisów:', error);

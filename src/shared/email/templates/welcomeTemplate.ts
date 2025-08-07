@@ -5,8 +5,8 @@ export interface WelcomeTemplateData {
   radius: number;
 }
 
-export const getWelcomeTemplate = ({email, latitude,longitude,radius}: WelcomeTemplateData): string => 
-`<!DOCTYPE html>
+export const getWelcomeTemplate = ({ email, latitude, longitude, radius }: WelcomeTemplateData): string =>
+  `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -65,10 +65,14 @@ export const getWelcomeTemplate = ({email, latitude,longitude,radius}: WelcomeTe
     </div>
   </div>
 </body>
-</html>`
+</html>`;
 
-
-export const getWelcomeMessage = ({email,latitude,longitude,radius}: WelcomeTemplateData): string => `🎉 FLIGHT CHECKER - Witaj w systemie powiadomień!
+export const getWelcomeMessage = ({
+  email,
+  latitude,
+  longitude,
+  radius,
+}: WelcomeTemplateData): string => `🎉 FLIGHT CHECKER - Witaj w systemie powiadomień!
 
 Gratulacje! Twoja subskrypcja została pomyślnie aktywowana.
 
@@ -79,7 +83,6 @@ Szczegóły subskrypcji:
 
 Od teraz będziesz otrzymywać powiadomienia o samolotach lecących w pobliżu wybranej lokalizacji.
 
-Dziękujemy za skorzystanie z Flight Checker! ✈️`
+Dziękujemy za skorzystanie z Flight Checker! ✈️`;
 
-export const getWelcomeTitle = ()=>`🎉 Witaj w Flight Checker! Subskrypcja została aktywowana`;
-
+export const getWelcomeTitle = () => `🎉 Witaj w Flight Checker! Subskrypcja została aktywowana`;

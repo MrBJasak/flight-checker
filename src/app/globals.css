@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "leaflet/dist/leaflet.css";
+@import 'tailwindcss';
+@import 'leaflet/dist/leaflet.css';
 
 body {
   font-family: 'Inter', 'system-ui', sans-serif;
@@ -29,7 +29,8 @@ body {
 }
 
 @keyframes bounce-slow {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -38,7 +39,8 @@ body {
 }
 
 @keyframes gradient {
-  0%, 100% {
+  0%,
+  100% {
     background-size: 200% 200%;
     background-position: left center;
   }
@@ -98,7 +100,7 @@ body {
   .modal-container {
     padding: 0.5rem;
   }
-  
+
   .modal-content {
     max-height: calc(100vh - 1rem);
   }

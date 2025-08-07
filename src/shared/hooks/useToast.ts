@@ -38,6 +38,6 @@ export const useToast = () => {
     warning,
     info,
     remove,
-    clear
+    clear,
   };
 };

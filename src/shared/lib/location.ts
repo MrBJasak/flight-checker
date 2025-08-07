@@ -1,4 +1,4 @@
-import { LocationInfo } from "../types";
+import { LocationInfo } from '../types';
 
 export const getLocationInfo = async (lat: number, lon: number): Promise<LocationInfo | null> => {
   try {
@@ -8,13 +8,13 @@ export const getLocationInfo = async (lat: number, lon: number): Promise<Locatio
         headers: {
           'User-Agent': 'FlightChecker/1.0',
         },
-      }
+      },
     );
-    
+
     if (!response.ok) {
       throw new Error('Nie udało się pobrać informacji o lokalizacji');
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -26,7 +26,7 @@ export const getLocationInfo = async (lat: number, lon: number): Promise<Locatio
 export const formatAddress = (locationInfo: LocationInfo): string => {
   const { address } = locationInfo;
   const parts = [];
-  
+
   if (address.road) {
     let street = address.road;
     if (address.house_number) {
@@ -34,18 +34,18 @@ export const formatAddress = (locationInfo: LocationInfo): string => {
     }
     parts.push(street);
   }
-  
+
   if (address.city) {
     parts.push(address.city);
   }
-  
+
   if (address.postcode) {
     parts.push(address.postcode);
   }
-  
+
   if (address.country) {
     parts.push(address.country);
   }
-  
+
   return parts.join(', ') || locationInfo.display_name;
 };

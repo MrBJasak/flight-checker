@@ -9,23 +9,23 @@ class ToastService {
   public subscribe(callback: ToastSubscriber): () => void {
     this.subscribers.push(callback);
     callback(this.toasts);
-    
+
     return () => {
-      this.subscribers = this.subscribers.filter(sub => sub !== callback);
+      this.subscribers = this.subscribers.filter((sub) => sub !== callback);
     };
   }
 
   private notify() {
-    this.subscribers.forEach(callback => callback([...this.toasts]));
+    this.subscribers.forEach((callback) => callback([...this.toasts]));
   }
 
- public show(message: string, type: ToastData['type'] = 'info', duration?: number): string {
+  public show(message: string, type: ToastData['type'] = 'info', duration?: number): string {
     const id = Math.random().toString(36).substring(2, 9);
     const toast: ToastData = {
       id,
       message,
       type,
-      duration: duration || (type === 'error' ? 8000 : 5000)
+      duration: duration || (type === 'error' ? 8000 : 5000),
     };
 
     this.toasts.push(toast);
@@ -38,7 +38,7 @@ class ToastService {
     return this.show(message, 'success', duration);
   }
 
- public error(message: string, duration?: number): string {
+  public error(message: string, duration?: number): string {
     return this.show(message, 'error', duration);
   }
 
@@ -51,7 +51,7 @@ class ToastService {
   }
 
   public remove(id: string) {
-    this.toasts = this.toasts.filter(toast => toast.id !== id);
+    this.toasts = this.toasts.filter((toast) => toast.id !== id);
     this.notify();
   }
 
