@@ -4,10 +4,10 @@
  * Sprawdza samoloty bezpośrednio w endpoincie używając OpenSky API
  */
 
-import { NextResponse } from 'next/server';
 import axios from 'axios';
-import { UserConfigService } from '../../../../shared/services/userConfigService';
+import { NextResponse } from 'next/server';
 import { getBoundingBox, haversine } from '../../../../shared/lib/geo';
+import { UserConfigService } from '../../../../shared/services/userConfigService';
 
 // Przechowywanie ostatnio widzianych samolotów w pamięci (w produkcji użyj Redis/Database)
 const lastSeenPlanes = new Map<string, number>();
@@ -16,30 +16,65 @@ const lastSeenPlanes = new Map<string, number>();
 function clearExpiredCache(expiryMs: number) {
   const now = Date.now();
   const expired = [];
-  
+
   for (const [key, timestamp] of lastSeenPlanes.entries()) {
     if (now - timestamp > expiryMs) {
       expired.push(key);
     }
   }
-  
-  expired.forEach(key => lastSeenPlanes.delete(key));
-  
+
+  expired.forEach((key) => lastSeenPlanes.delete(key));
+
   if (expired.length > 0) {
     console.log(`🧹 Wyczyszczono ${expired.length} wygasłych wpisów z cache`);
+  }
+}
+
+// Funkcja do wywołania OpenSky API z retry logic
+async function fetchOpenSkyData(lamin: number, lamax: number, lomin: number, lomax: number, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      console.log(`📡 OpenSky API - próba ${attempt}/${retries}`);
+
+      const response = await axios.get('https://opensky-network.org/api/states/all', {
+        params: { lamin, lamax, lomin, lomax },
+        timeout: 15000, // Krótszy timeout - 15s
+        headers: {
+          'User-Agent': 'FlightChecker/1.0',
+        },
+      });
+
+      console.log(`✅ OpenSky API - sukces (${response.data?.states?.length || 0} samolotów)`);
+      return response.data?.states || [];
+    } catch (error) {
+      console.log(
+        `❌ OpenSky API - próba ${attempt} nieudana:`,
+        error instanceof Error ? error.message : 'Unknown error',
+      );
+
+      if (attempt === retries) {
+        // Ostatnia próba - rzuć błąd
+        throw error;
+      }
+
+      // Pauza przed kolejną próbą (exponential backoff)
+      const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+      console.log(`⏳ Czekam ${delay}ms przed kolejną próbą...`);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
 }
 
 export async function POST() {
   try {
     console.log(`🚀 Cron job wywołany: ${new Date().toISOString()}`);
-    
+
     const expiryMs = parseInt(process.env.FLIGHT_MONITOR_EXPIRY || '3600000'); // 1 godzina domyślnie
     console.log(`🔍 Pobieranie aktywnych użytkowników...`);
 
     // Pobierz wszystkich aktywnych użytkowników z bazy danych
     const users = await UserConfigService.getAllActiveUsers();
-    
+
     if (users.length === 0) {
       console.log('⚠️  Brak aktywnych użytkowników do monitorowania');
       return NextResponse.json({
@@ -61,23 +96,16 @@ export async function POST() {
 
     // Sprawdź samoloty dla każdego użytkownika
     for (const user of users) {
-      console.log(`🔍 Sprawdzanie dla użytkownika: ${user.email} (${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}, ${user.radius}km)`);
-      
-      // Pobierz bounding box dla użytkownika
-      const { lamin, lamax, lomin, lomax } = getBoundingBox(
-        user.latitude,
-        user.longitude,
-        user.radius
+      console.log(
+        `🔍 Sprawdzanie dla użytkownika: ${user.email} (${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}, ${user.radius}km)`,
       );
 
-      try {
-        // Wywołaj OpenSky API
-        const response = await axios.get('https://opensky-network.org/api/states/all', {
-          params: { lamin, lamax, lomin, lomax },
-          timeout: 30000,
-        });
+      // Pobierz bounding box dla użytkownika
+      const { lamin, lamax, lomin, lomax } = getBoundingBox(user.latitude, user.longitude, user.radius);
 
-        const planes = response.data?.states || [];
+      try {
+        // Wywołaj OpenSky API z retry logic
+        const planes = await fetchOpenSkyData(lamin, lamax, lomin, lomax);
         let userPlanes = 0;
         let userNewPlanes = 0;
 
@@ -99,14 +127,16 @@ export async function POST() {
             // Sprawdź czy to nowy samolot dla tego użytkownika
             const cacheKey = `${user.email}:${icao}`;
             const lastSeen = lastSeenPlanes.get(cacheKey);
-            
+
             if (!lastSeen || now - lastSeen > expiryMs) {
               userNewPlanes++;
               totalNewPlanes++;
-              
+
               const altitudeText = alt ? `${Math.round(alt * 3.28084)}ft` : 'brak wysokości';
-              console.log(`✈️  [${user.email}] ${callsign?.trim() || 'Unknown'} (${icao}) - ${lat.toFixed(4)}, ${lon.toFixed(4)} - ${altitudeText} - ${distance.toFixed(1)}km`);
-              
+              console.log(
+                `✈️  [${user.email}] ${callsign?.trim() || 'Unknown'} (${icao}) - ${lat.toFixed(4)}, ${lon.toFixed(4)} - ${altitudeText} - ${distance.toFixed(1)}km`,
+              );
+
               lastSeenPlanes.set(cacheKey, now);
             }
           }
@@ -117,25 +147,26 @@ export async function POST() {
           planesFound: userPlanes,
           newPlanes: userNewPlanes,
           location: `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}`,
-          radius: `${user.radius}km`
+          radius: `${user.radius}km`,
         });
 
         console.log(`📊 [${user.email}] Znaleziono ${userPlanes} samolotów (${userNewPlanes} nowych)`);
-
       } catch (error) {
-        console.error(`❌ Błąd OpenSky API dla użytkownika ${user.email}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`❌ OpenSky API całkowicie niedostępne dla użytkownika ${user.email}:`, errorMessage);
+
         userResults.push({
           email: user.email,
           planesFound: 0,
           newPlanes: 0,
           location: `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}`,
           radius: `${user.radius}km`,
-          error: 'API Error'
+          error: `API Timeout: ${errorMessage.includes('ETIMEDOUT') ? 'Serwer nie odpowiada' : errorMessage}`,
         });
       }
 
       // Krótka pauza między użytkownikami żeby nie przeciążyć API
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     // Wyczyść stare wpisy z cache
@@ -152,12 +183,11 @@ export async function POST() {
       totalTracked: lastSeenPlanes.size,
       userResults,
     });
-
   } catch (error) {
     console.error('❌ Błąd podczas sprawdzania samolotów:', error);
     return NextResponse.json(
       { error: 'Server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -166,19 +196,21 @@ export async function POST() {
 export async function GET() {
   try {
     const users = await UserConfigService.getAllActiveUsers();
-    
+
     return NextResponse.json({
       message: 'Vercel Cron Job endpoint dla monitorowania samolotów - BEZ AUTORYZACJI',
       usage: 'POST - wywołuje monitoring bezpośrednio przez OpenSky API | GET - pokazuje status',
       features: [
         '✈️ Bezpośrednie sprawdzanie OpenSky API',
-        '👥 Multi-user support z bazy danych', 
+        '👥 Multi-user support z bazy danych',
         '🔄 Cache dla unikania duplikatów',
         '🧹 Automatyczne czyszczenie wygasłych wpisów',
-        '📊 Szczegółowe logi per użytkownik'
+        '📊 Szczegółowe logi per użytkownik',
+        '🔄 Retry logic przy błędach API (3 próby)',
+        '⚠️ OpenSky API może być czasowo niestabilne',
       ],
       activeUsers: users.length,
-      users: users.map(u => ({
+      users: users.map((u) => ({
         email: u.email,
         location: `${u.latitude.toFixed(4)}, ${u.longitude.toFixed(4)}`,
         radius: `${u.radius}km`,
@@ -188,8 +220,8 @@ export async function GET() {
       },
       cache: {
         totalTracked: lastSeenPlanes.size,
-        message: 'Liczba unikalnych samolotów w pamięci cache'
-      }
+        message: 'Liczba unikalnych samolotów w pamięci cache',
+      },
     });
   } catch (error) {
     return NextResponse.json({
@@ -199,5 +231,3 @@ export async function GET() {
     });
   }
 }
-
-
