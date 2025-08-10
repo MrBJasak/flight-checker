@@ -8,6 +8,7 @@ import axios from 'axios';
 import { NextResponse } from 'next/server';
 import { getBoundingBox, haversine } from '../../../../shared/lib/geo';
 import { UserConfigService } from '../../../../shared/services/userConfigService';
+import { emailService } from '../../../../shared/email/email';
 
 // Przechowywanie ostatnio widzianych samolotów w pamięci (w produkcji użyj Redis/Database)
 const lastSeenPlanes = new Map<string, number>();
@@ -137,6 +138,22 @@ export async function POST() {
                 `✈️  [${user.email}] ${callsign?.trim() || 'Unknown'} (${icao}) - ${lat.toFixed(4)}, ${lon.toFixed(4)} - ${altitudeText} - ${distance.toFixed(1)}km`,
               );
 
+              // Wyślij email o nowym samolocie
+              try {
+                await emailService.sendFlightNotification({
+                  email: user.email,
+                  callsign: callsign?.trim() || undefined,
+                  icao,
+                  latitude: lat,
+                  longitude: lon,
+                  altitude: alt || undefined,
+                  distance: parseFloat(distance.toFixed(1)),
+                });
+                console.log(`📧 Email wysłany do ${user.email} o samolocie ${callsign || icao}`);
+              } catch (emailError) {
+                console.error(`❌ Błąd wysyłania emaila do ${user.email}:`, emailError);
+              }
+
               lastSeenPlanes.set(cacheKey, now);
             }
           }
@@ -148,9 +165,10 @@ export async function POST() {
           newPlanes: userNewPlanes,
           location: `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}`,
           radius: `${user.radius}km`,
+          emailsSent: userNewPlanes, // Liczba wysłanych emaili = liczba nowych samolotów
         });
 
-        console.log(`📊 [${user.email}] Znaleziono ${userPlanes} samolotów (${userNewPlanes} nowych)`);
+        console.log(`📊 [${user.email}] Znaleziono ${userPlanes} samolotów (${userNewPlanes} nowych, ${userNewPlanes} emaili wysłanych)`);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         console.error(`❌ OpenSky API całkowicie niedostępne dla użytkownika ${user.email}:`, errorMessage);
@@ -161,6 +179,7 @@ export async function POST() {
           newPlanes: 0,
           location: `${user.latitude.toFixed(4)}, ${user.longitude.toFixed(4)}`,
           radius: `${user.radius}km`,
+          emailsSent: 0,
           error: `API Timeout: ${errorMessage.includes('ETIMEDOUT') ? 'Serwer nie odpowiada' : errorMessage}`,
         });
       }
@@ -172,7 +191,7 @@ export async function POST() {
     // Wyczyść stare wpisy z cache
     clearExpiredCache(expiryMs);
 
-    console.log(`✅ Sprawdzenie zakończone - Łącznie: ${totalPlanes} samolotów, ${totalNewPlanes} nowych`);
+    console.log(`✅ Sprawdzenie zakończone - Łącznie: ${totalPlanes} samolotów, ${totalNewPlanes} nowych, ${totalNewPlanes} emaili wysłanych`);
 
     return NextResponse.json({
       success: true,
@@ -180,6 +199,7 @@ export async function POST() {
       totalUsers: users.length,
       totalPlanes,
       newPlanes: totalNewPlanes,
+      totalEmailsSent: totalNewPlanes,
       totalTracked: lastSeenPlanes.size,
       userResults,
     });
@@ -207,6 +227,7 @@ export async function GET() {
         '🧹 Automatyczne czyszczenie wygasłych wpisów',
         '📊 Szczegółowe logi per użytkownik',
         '🔄 Retry logic przy błędach API (3 próby)',
+        '📧 Automatyczne wysyłanie emaili o nowych samolotach',
         '⚠️ OpenSky API może być czasowo niestabilne',
       ],
       activeUsers: users.length,
@@ -217,6 +238,7 @@ export async function GET() {
       })),
       env: {
         expiryMs: process.env.FLIGHT_MONITOR_EXPIRY || '3600000 (1 hour default)',
+        emailEnabled: process.env.EMAIL_USER ? '✅ Skonfigurowane' : '❌ Brak konfiguracji EMAIL_USER/EMAIL_PASS',
       },
       cache: {
         totalTracked: lastSeenPlanes.size,
