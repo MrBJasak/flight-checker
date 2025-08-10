@@ -7,6 +7,7 @@
 import axios from 'axios';
 import { NextResponse } from 'next/server';
 import { emailService } from '../../../../shared/email/email';
+import { getAirline, getDirection } from '../../../../shared/lib/airlines';
 import { getBoundingBox, haversine } from '../../../../shared/lib/geo';
 import { UserConfigService } from '../../../../shared/services/userConfigService';
 
@@ -55,12 +56,26 @@ async function fetchOpenSkyData(lamin: number, lamax: number, lomin: number, lom
 
 export async function POST() {
   try {
+    console.log(`🚀 Cron job start: ${new Date().toISOString()}`);
+
     const expiryMs = parseInt(process.env.FLIGHT_MONITOR_EXPIRY || '3600000'); // 1 godzina domyślnie
 
+    // Sprawdź czy mamy konfigurację bazy danych
+    if (!process.env.DATABASE_URL) {
+      console.error('❌ Brak DATABASE_URL w zmiennych środowiskowych');
+      return NextResponse.json(
+        { error: 'Database not configured', details: 'DATABASE_URL environment variable is missing' },
+        { status: 500 },
+      );
+    }
+
     // Pobierz wszystkich aktywnych użytkowników z bazy danych
+    console.log('📋 Pobieranie użytkowników...');
     const users = await UserConfigService.getAllActiveUsers();
+    console.log(`👥 Użytkownicy: ${users.length}`);
 
     if (users.length === 0) {
+      console.log('⚠️ Brak użytkowników');
       return NextResponse.json({
         success: true,
         message: 'Brak aktywnych użytkowników',
@@ -78,21 +93,28 @@ export async function POST() {
 
     // Sprawdź samoloty dla każdego użytkownika
     for (const user of users) {
+      console.log(`🔍 Sprawdzanie: ${user.email}`);
+
       // Pobierz bounding box dla użytkownika
       const { lamin, lamax, lomin, lomax } = getBoundingBox(user.latitude, user.longitude, user.radius);
 
       try {
         // Wywołaj OpenSky API z retry logic
+        console.log(`📡 OpenSky API call...`);
         const planes = await fetchOpenSkyData(lamin, lamax, lomin, lomax);
+        console.log(`✅ API response: ${planes.length} samolotów`);
         let userPlanes = 0;
         let userNewPlanes = 0;
 
         for (const plane of planes) {
           const icao = plane[0];
           const callsign = plane[1];
+          const originCountry = plane[2]; // Kraj pochodzenia
           const lon = plane[5];
           const lat = plane[6];
           const alt = plane[7];
+          const velocity = plane[9]; // Prędkość w m/s
+          const trueTrack = plane[10]; // Kierunek lotu w stopniach
 
           if (!lat || !lon || plane[8]) continue; // Pomiń jeśli brak pozycji lub samolot na ziemi
 
@@ -111,24 +133,31 @@ export async function POST() {
               totalNewPlanes++;
 
               const altitudeText = alt ? `${Math.round(alt * 3.28084)}ft` : 'brak wysokości';
+              const speedText = velocity ? `${Math.round(velocity * 3.6)}km/h` : 'brak prędkości';
+              const directionText = trueTrack ? getDirection(trueTrack) : 'brak kierunku';
+              const airlineName = getAirline(callsign);
+
               console.log(
-                `✈️  [${user.email}] ${callsign?.trim() || 'Unknown'} (${icao}) - ${lat.toFixed(4)}, ${lon.toFixed(4)} - ${altitudeText} - ${distance.toFixed(1)}km`,
+                `✈️  [${user.email}] ${callsign?.trim() || 'Unknown'} (${icao}) - ${airlineName ? `${airlineName} - ` : ''}${originCountry || 'Unknown country'} - ${lat.toFixed(4)}, ${lon.toFixed(4)} - ${altitudeText} - ${speedText} - ${directionText} - ${distance.toFixed(1)}km`,
               );
 
-              // Wyślij email o nowym samolocie
-              try {
-                await emailService.sendFlightNotification({
-                  email: user.email,
-                  callsign: callsign?.trim() || undefined,
-                  icao,
-                  latitude: lat,
-                  longitude: lon,
-                  altitude: alt || undefined,
-                  distance: parseFloat(distance.toFixed(1)),
-                });
-                console.log(`📧 Email wysłany do ${user.email} o samolocie ${callsign || icao}`);
-              } catch (emailError) {
-                console.error(`❌ Błąd wysyłania emaila do ${user.email}:`, emailError);
+              // Wyślij email o nowym samolocie (tylko jeśli skonfigurowany)
+              if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+                try {
+                  await emailService.sendFlightNotification({
+                    email: user.email,
+                    callsign: callsign?.trim() || undefined,
+                    icao,
+                    latitude: lat,
+                    longitude: lon,
+                    altitude: alt || undefined,
+                    distance: parseFloat(distance.toFixed(1)),
+                    address: `${airlineName ? `${airlineName} | ` : ''}${originCountry || 'Unknown'} | ${speedText} | ${directionText}`,
+                  });
+                  console.log(`📧 Email wysłany do ${user.email} o samolocie ${callsign || icao}`);
+                } catch (emailError) {
+                  console.error(`❌ Błąd wysyłania emaila do ${user.email}:`, emailError);
+                }
               }
 
               lastSeenPlanes.set(cacheKey, now);
@@ -144,8 +173,11 @@ export async function POST() {
           radius: `${user.radius}km`,
           emailsSent: userNewPlanes, // Liczba wysłanych emaili = liczba nowych samolotów
         });
+
+        console.log(`📊 [${user.email}] Samoloty: ${userPlanes}, Nowe: ${userNewPlanes}`);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`❌ API błąd dla ${user.email}: ${errorMessage}`);
 
         userResults.push({
           email: user.email,
@@ -165,6 +197,8 @@ export async function POST() {
     // Wyczyść stare wpisy z cache
     clearExpiredCache(expiryMs);
 
+    console.log(`✅ Koniec - Samoloty: ${totalPlanes}, Nowe: ${totalNewPlanes}, Emaile: ${totalNewPlanes}`);
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
@@ -176,7 +210,7 @@ export async function POST() {
       userResults,
     });
   } catch (error) {
-    console.error('❌ Błąd podczas sprawdzania samolotów:', error);
+    console.error('❌ GŁÓWNY BŁĄD:', error);
     return NextResponse.json(
       { error: 'Server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 },
