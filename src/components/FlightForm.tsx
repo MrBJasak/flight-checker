@@ -1,13 +1,12 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { HiCheckCircle, HiCog, HiExclamationCircle, HiMail } from 'react-icons/hi';
 import { z } from 'zod';
 import { formSchema } from '../shared/lib/validation';
-import { FormData, LocationData, AircraftFilter } from '../shared/types';
-import AircraftSelector from './AircraftSelector';
-import { useEffect, useState } from 'react';
+import { AircraftFilter, FormData, LocationData } from '../shared/types';
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -168,14 +167,14 @@ export default function FlightForm({ onSubmit, location, onRadiusChange }: Fligh
         </div>
       </div>
 
-      {/* Aircraft Selector */}
-      {!isLoadingOptions && (
+      {/* Currently disable when i will get data from planes */}
+      {/* {!isLoadingOptions && (
         <AircraftSelector
           selectedFilters={aircraftFilters}
           onFiltersChange={setAircraftFilters}
           availableOptions={aircraftOptions}
         />
-      )}
+      )} */}
 
       {/* Submit Button */}
       <div className='space-y-4'>

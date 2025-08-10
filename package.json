@@ -12,7 +12,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "vercel:test": "curl http://localhost:3000/api/test/flight-monitor",
+    "vercel:cron:test": "curl -X POST http://localhost:3000/api/test/flight-monitor"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
