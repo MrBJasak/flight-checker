@@ -3,23 +3,17 @@
  * Wywołuje się automatycznie w określonych interwałach
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { FlightChecker } from '../../../../shared/services/flightChecker';
 import { UserConfigService } from '../../../../shared/services/userConfigService';
 
 // Przechowywanie ostatnio widzianych samolotów w pamięci (w produkcji użyj Redis/Database)
 const lastSeenPlanes = new Map<string, number>();
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    // Sprawdź token autoryzacji (zabezpieczenie przed nieautoryzowanymi wywołaniami)
-    const authToken = request.headers.get('authorization');
-    const expectedToken = process.env.CRON_SECRET;
+    console.log(`🚀 Cron job wywołany: ${new Date().toISOString()}`);
     
-    if (!expectedToken || authToken !== `Bearer ${expectedToken}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // Pobierz konfigurację z zmiennych środowiskowych lub domyślne wartości
     const expiryMs = parseInt(process.env.FLIGHT_MONITOR_EXPIRY || '300000');
 
@@ -71,7 +65,7 @@ export async function GET() {
     
     return NextResponse.json({
       message: 'Vercel Cron Job endpoint dla monitorowania samolotów',
-      usage: 'POST z authorization header',
+      usage: 'POST - wywołuje monitoring | GET - pokazuje status',
       activeUsers: users.length,
       users: users.map(u => ({
         email: u.email,
@@ -79,7 +73,6 @@ export async function GET() {
         radius: `${u.radius}km`,
       })),
       env: {
-        cronSecret: process.env.CRON_SECRET ? 'ustawione' : 'nie ustawione',
         expiryMs: process.env.FLIGHT_MONITOR_EXPIRY || '300000 (default)',
       }
     });
@@ -91,3 +84,5 @@ export async function GET() {
     });
   }
 }
+
+
