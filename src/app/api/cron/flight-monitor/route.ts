@@ -1,6 +1,6 @@
 /**
- * Vercel Cron Job endpoint dla monitorowania samolotów
- * Wywołuje się automatycznie w określonych interwałach
+ * Vercel Cron Job endpoint dla monitorowania samolotów - BEZ AUTORYZACJI
+ * Wywołuje się automatycznie przez cron-job.org
  */
 
 import { NextResponse } from 'next/server';
@@ -64,7 +64,7 @@ export async function GET() {
     const users = await UserConfigService.getAllActiveUsers();
     
     return NextResponse.json({
-      message: 'Vercel Cron Job endpoint dla monitorowania samolotów',
+      message: 'Vercel Cron Job endpoint dla monitorowania samolotów - BEZ AUTORYZACJI',
       usage: 'POST - wywołuje monitoring | GET - pokazuje status',
       activeUsers: users.length,
       users: users.map(u => ({
@@ -78,7 +78,7 @@ export async function GET() {
     });
   } catch (error) {
     return NextResponse.json({
-      message: 'Vercel Cron Job endpoint dla monitorowania samolotów',
+      message: 'Vercel Cron Job endpoint dla monitorowania samolotów - BEZ AUTORYZACJI',
       error: 'Błąd podczas pobierania użytkowników',
       details: error instanceof Error ? error.message : 'Unknown error',
     });
