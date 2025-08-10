@@ -1,8 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { emailService } from '../../../shared/email/email';
 import { db } from '../../../shared/lib/db';
-import { subscriptions, subscriptionAircraft } from '../../../shared/lib/db/schema';
-import { AircraftFilter } from '../../../shared/types';
+import { subscriptions } from '../../../shared/lib/db/schema';
 
 export async function POST(req: Request) {
   try {
@@ -30,31 +29,34 @@ export async function POST(req: Request) {
     // Wstaw subskrypcję w transakcji
     await db.transaction(async (tx) => {
       // Wstaw subskrypcję
-      const [subscription] = await tx.insert(subscriptions).values({
-        email,
-        latitude,
-        longitude,
-        radius,
-      }).returning({ id: subscriptions.id });
+      const [subscription] = await tx
+        .insert(subscriptions)
+        .values({
+          email,
+          latitude,
+          longitude,
+          radius,
+        })
+        .returning({ id: subscriptions.id });
 
-      // Jeśli są filtry samolotów, wstaw je
-      if (aircraftFilters && Array.isArray(aircraftFilters) && aircraftFilters.length > 0) {
-        const filterInserts = aircraftFilters
-          .filter((filter: AircraftFilter) => 
-            filter.manufacturerName || filter.model || filter.typeCode || filter.operator
-          )
-          .map((filter: AircraftFilter) => ({
-            subscriptionId: subscription.id,
-            manufacturername: filter.manufacturerName || null,
-            model: filter.model || null,
-            typecode: filter.typeCode || null,
-            operator: filter.operator || null,
-          }));
+      // // Jeśli są filtry samolotów, wstaw je
+      // if (aircraftFilters && Array.isArray(aircraftFilters) && aircraftFilters.length > 0) {
+      //   const filterInserts = aircraftFilters
+      //     .filter((filter: AircraftFilter) =>
+      //       filter.manufacturerName || filter.model || filter.typeCode || filter.operator
+      //     )
+      //     .map((filter: AircraftFilter) => ({
+      //       subscriptionId: subscription.id,
+      //       manufacturername: filter.manufacturerName || null,
+      //       model: filter.model || null,
+      //       typecode: filter.typeCode || null,
+      //       operator: filter.operator || null,
+      //     }));
 
-        if (filterInserts.length > 0) {
-          await tx.insert(subscriptionAircraft).values(filterInserts);
-        }
-      }
+      //   if (filterInserts.length > 0) {
+      //     await tx.insert(subscriptionAircraft).values(filterInserts);
+      //   }
+      // }
     });
 
     try {

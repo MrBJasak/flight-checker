@@ -1,12 +1,12 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { HiCheckCircle, HiCog, HiExclamationCircle, HiMail } from 'react-icons/hi';
 import { z } from 'zod';
 import { formSchema } from '../shared/lib/validation';
-import { AircraftFilter, FormData, LocationData } from '../shared/types';
+import { FormData, LocationData } from '../shared/types';
 
 type FormValues = z.infer<typeof formSchema>;
 
@@ -24,14 +24,14 @@ interface AircraftOptions {
 }
 
 export default function FlightForm({ onSubmit, location, onRadiusChange }: FlightFormProps) {
-  const [aircraftFilters, setAircraftFilters] = useState<AircraftFilter[]>([]);
-  const [aircraftOptions, setAircraftOptions] = useState<AircraftOptions>({
-    manufacturers: [],
-    models: [],
-    typeCodes: [],
-    operators: [],
-  });
-  const [isLoadingOptions, setIsLoadingOptions] = useState(false);
+  // const [aircraftFilters, setAircraftFilters] = useState<AircraftFilter[]>([]);
+  // const [aircraftOptions, setAircraftOptions] = useState<AircraftOptions>({
+  //   manufacturers: [],
+  //   models: [],
+  //   typeCodes: [],
+  //   operators: [],
+  // });
+  // const [isLoadingOptions, setIsLoadingOptions] = useState(false);
 
   const {
     register,
@@ -53,17 +53,17 @@ export default function FlightForm({ onSubmit, location, onRadiusChange }: Fligh
   // Pobierz opcje samolotów
   useEffect(() => {
     const fetchAircraftOptions = async () => {
-      setIsLoadingOptions(true);
+      // setIsLoadingOptions(true);
       try {
         const response = await fetch('/api/aircraft-options');
         if (response.ok) {
           const options = await response.json();
-          setAircraftOptions(options);
+          // setAircraftOptions(options);
         }
       } catch (error) {
         console.error('Błąd podczas pobierania opcji samolotów:', error);
       } finally {
-        setIsLoadingOptions(false);
+        // setIsLoadingOptions(false);
       }
     };
 
@@ -82,7 +82,7 @@ export default function FlightForm({ onSubmit, location, onRadiusChange }: Fligh
         ...location,
         radius: data.radius,
       },
-      aircraftFilters,
+      // aircraftFilters,
     });
   };
 
